@@ -107,15 +107,21 @@ public class ProductProvider extends ContentProvider {
 
         // Check that the quantity is not negative
         Integer quantity = values.getAsInteger(ProductEntry.COLUMN_PRODUCT_QUANTITY);
-        if (quantity < 1) {
+        if (quantity < 0) {
             throw new IllegalArgumentException("Quantity cannot be negative");
         }
 
         // Check that the supplier is not null
-        String supplier = values.getAsString(ProductEntry.COLUMN_PRODUCT_SUPPLIER);
+        String supplier = values.getAsString(ProductEntry.COLUMN_PRODUCT_SUPPLIER_NAME);
         if (supplier == null) {
             throw new IllegalArgumentException("Item has no supplier");
         }
+
+        // Check that supplier email is not null
+        /*String supplierEmail = values.getAsString(ProductEntry.COLUMN_PRODUCT_SUPPLIER_EMAIL);
+        if (supplierEmail == null) {
+            throw new IllegalArgumentException("Item has no supplier_email");
+        }*/
 
         // Get writeable database
         SQLiteDatabase database = mDbHelper.getWritableDatabase();

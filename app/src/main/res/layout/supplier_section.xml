@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <LinearLayout
+        android:id="@+id/supplier_section"
+        style="@style/CategoryStyle"
+        android:orientation="vertical">
+        <!-- Supplier name category -->
+        <LinearLayout
+            android:id="@+id/container_supplier"
+            style="@style/CategoryStyle">
+
+            <!-- Label -->
+            <TextView
+                style="@style/LabelStyle"
+                android:text="@string/category_supplier_name" />
+
+            <!-- Input fields -->
+            <LinearLayout style="@style/input_fields">
+
+                <!-- Supplier field -->
+                <EditText
+                    android:id="@+id/edit_product_supplier"
+                    style="@style/EditorFieldStyle"
+
+                    android:hint="@string/hint_supplier_name"
+                    android:inputType="textCapWords" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Supplier email category -->
+        <LinearLayout
+            android:id="@+id/container_supplier_email"
+            style="@style/CategoryStyle">
+
+            <!-- Label -->
+            <TextView
+                style="@style/LabelStyle"
+                android:text="@string/supplier_email" />
+
+            <!-- Input fields -->
+            <LinearLayout style="@style/input_fields">
+
+                <!-- Supplier field -->
+                <EditText
+                    android:id="@+id/edit_product_supplier_email"
+                    style="@style/EditorFieldStyle"
+
+                    android:hint="@string/supplier_email_hit"
+                    android:inputType="textEmailAddress" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</layout>

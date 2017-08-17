@@ -15,7 +15,7 @@
 
     <string name="category_item">Item Name</string>
 
-    <string name="category_supplier">Supplier</string>
+    <string name="category_supplier_name">Supplier Name</string>
 
     <string name="category_image">Image</string>
 
@@ -113,5 +113,15 @@
     <string name="currency">$ %1$s</string>
 
     <string name="available_items">%d available items</string>
+
+    <string name="supplier_email">Supplier Email</string>
+
+    <string name="supplier_email_hit">Supplier Email (optional)</string>
+
+    <string name="empty_email">Your supplier doesn\'t have an email,\n please save an email </string>
+
+    <string name="supplies_order">Supplies Order: %1$s</string>
+
+    <string name="dummy_provider_email">gothamcity@fakemail.com</string>
 
 </resources>

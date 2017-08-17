@@ -1,18 +1,3 @@
-/*
- * Copyright (C) 2016 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package com.example.android.inventory;
 
 import android.app.LoaderManager;
@@ -22,49 +7,53 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.Loader;
 import android.database.Cursor;
+import android.databinding.DataBindingUtil;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
-import android.os.ParcelFileDescriptor;
 import android.support.v4.app.NavUtils;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.android.inventory.data.ProductContract.ProductEntry;
+import com.example.android.inventory.databinding.ActivityEditorBinding;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 
 import static java.lang.Integer.parseInt;
+
 /**
  * Allows user to create a new product or edit an existing one.
  */
 public class EditorActivity extends AppCompatActivity implements
         LoaderManager.LoaderCallbacks<Cursor> {
 
-     // Identifier for the product data loader
+    // Identifier for the product data loader
     private static final int EXISTING_PRODUCT_LOADER = 1;
 
-     // Content URI for the existing product (null if it's a new product)
+
+    // Content URI for the existing product (null if it's a new product)
     private Uri mCurrentProductUri;
 
     public static final int IMAGE_GALLERY_REQUEST = 20;
-    int quantity = 1;
+    int quantity = 0;
     private boolean saveFlag;
     private boolean mProductHasChanged = false;
     public Uri pictureUri;
+    String supplierEmail;
+    String productName;
 
     private View.OnTouchListener mTouchListener = new View.OnTouchListener() {
         @Override
@@ -74,30 +63,18 @@ public class EditorActivity extends AppCompatActivity implements
         }
     };
 
-    /**
-     * EditText fields to enter the product info
-     */
-    private EditText mNameEditText;
-    private EditText mPriceEditText;
-    private EditText mQuantityEditText;
-    private EditText mSupplierEditText;
-    private ImageView imgPicture;
-
-    private Intent mRequestFileIntent;
-    private ParcelFileDescriptor mInputPFD;
+    //Binding for the activity editor layout.
+    ActivityEditorBinding binding;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_editor);
-
+        binding = DataBindingUtil.setContentView(this, R.layout.activity_editor);
 
         // Examine the intent that was used to launch this activity,
         // in order to figure out if we're creating a new product or editing an existing one.
         Intent intent = getIntent();
         mCurrentProductUri = intent.getData();
-
-        Button contactProvider = (Button) findViewById(R.id.contact_supplier);
 
         // If the intent DOES NOT contain a product content URI, then we know that we are
         // creating a new product.
@@ -109,53 +86,47 @@ public class EditorActivity extends AppCompatActivity implements
             // (It doesn't make sense to delete a product that hasn't been created yet.)
             invalidateOptionsMenu();
 
-            contactProvider.setVisibility(View.GONE);
+            binding.buttonsInclude.contactSupplier.setVisibility(View.GONE);
         } else {
             // Otherwise this is an existing product, so change app bar to say "Edit Item"
             setTitle(getString(R.string.editor_activity_title_edit_item));
-            Button addImage = (Button) findViewById(R.id.insert_image_button);
-            addImage.setText(R.string.change_image);
-            contactProvider.setVisibility(View.VISIBLE);
+            binding.buttonsInclude.insertImageButton.setText(R.string.change_image);
+            binding.buttonsInclude.contactSupplier.setVisibility(View.VISIBLE);
             getLoaderManager().initLoader(EXISTING_PRODUCT_LOADER, null, this);
         }
 
-        // Find all relevant views that we will need to read user input from
-        mNameEditText = (EditText) findViewById(R.id.edit_item_name);
-        mPriceEditText = (EditText) findViewById(R.id.edit_item_price);
-        mQuantityEditText = (EditText) findViewById(R.id.edit_item_quantity);
-        mSupplierEditText = (EditText) findViewById(R.id.edit_product_supplier);
+        binding.quantityInclude.editItemQuantity.setText(String.valueOf(quantity));
 
-        mQuantityEditText.setText(String.valueOf(quantity));
+        // Set on touch listeners no the input fields
+        binding.itemInclude.editItemName.setOnTouchListener(mTouchListener);
+        binding.itemInclude.editItemPrice.setOnTouchListener(mTouchListener);
+        binding.quantityInclude.editItemQuantity.setOnTouchListener(mTouchListener);
+        binding.supplierInclude.editProductSupplier.setOnTouchListener(mTouchListener);
+        binding.supplierInclude.editProductSupplierEmail.setOnTouchListener(mTouchListener);
 
-        mNameEditText.setOnTouchListener(mTouchListener);
-        mPriceEditText.setOnTouchListener(mTouchListener);
-        mQuantityEditText.setOnTouchListener(mTouchListener);
-        mSupplierEditText.setOnTouchListener(mTouchListener);
-
-        // get access to the image view.
-        imgPicture = (ImageView) findViewById(R.id.insert_image_view);
+        Button addImage = (Button) findViewById(R.id.insert_image_button);
+        addImage.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                openGallery();
+            }
+        });
     }
 
-    /**
-     * This method will be invoked when the user clicks insert image button
-     *
-     * @param v
-     */
-    public void openGallery(View v) {
+    public void openGallery() {
+
         // invoke the image gallery using an implict intent.
-        Intent photoPickerIntent = new Intent(Intent.ACTION_GET_CONTENT);
+        Intent photoPickerIntent;
 
-        // where do we want to find the data?
-        File pictureDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-        String pictureDirectoryPath = pictureDirectory.getPath();
-        // finally, get a URI representation
-        Uri data = Uri.parse(pictureDirectoryPath);
+        if (Build.VERSION.SDK_INT < 19) {
+            photoPickerIntent = new Intent(Intent.ACTION_GET_CONTENT);
+        } else {
+            photoPickerIntent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            photoPickerIntent.addCategory(Intent.CATEGORY_OPENABLE);
+        }
 
-        // set the data and type.  Get all image types.
-        photoPickerIntent.setDataAndType(data, "image/*");
-
-        // we will invoke this activity, and get something back from it.
-        startActivityForResult(photoPickerIntent, IMAGE_GALLERY_REQUEST);
+        photoPickerIntent.setType("image/*");
+        startActivityForResult(Intent.createChooser(photoPickerIntent, "Select Picture"), IMAGE_GALLERY_REQUEST);
     }
 
     @Override
@@ -167,40 +138,42 @@ public class EditorActivity extends AppCompatActivity implements
             // if we are here, everything processed successfully.
             if (requestCode == IMAGE_GALLERY_REQUEST) {
                 // if we are here, we are hearing back from the image gallery.
-                    // the address of the image on the SD Card.
-                    pictureUri = data.getData();
+                // the address of the image on the SD Card.
+                pictureUri = data.getData();
 
-               // Log.v("pictureUri 2", pictureUri.toString());
-                    // declare a stream to read the image data from the SD Card.
-                    InputStream inputStream;
+                // Log.v("pictureUri 2", pictureUri.toString());
+                // declare a stream to read the image data from the SD Card.
+                InputStream inputStream;
 
-                    // we are getting an input stream, based on the URI of the image.
-                    try {
-                        inputStream = getContentResolver().openInputStream(pictureUri);
+                // we are getting an input stream, based on the URI of the image.
+                try {
+                    inputStream = getContentResolver().openInputStream(pictureUri);
 
-                        // get a bitmap from the stream.
-                        Bitmap image = BitmapFactory.decodeStream(inputStream);
-                        // show the image to the user
-                        imgPicture.setImageBitmap(image);
+                    // get a bitmap from the stream.
+                    Bitmap image = BitmapFactory.decodeStream(inputStream);
+                    // show the image to the user
 
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
-                        // show a message to the user indictating that the image is unavailable.
-                        Toast.makeText(this, "Unable to open image", Toast.LENGTH_LONG).show();
-                    }
+                    binding.buttonsInclude.productImage.setImageBitmap(image);
+
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                    // show a message to the user indictating that the image is unavailable.
+                    Toast.makeText(this, "Unable to open image", Toast.LENGTH_LONG).show();
                 }
             }
         }
+    }
 
     private void saveProduct() {
 
         saveFlag = false;
-        String nameString = mNameEditText.getText().toString().trim();
-        String priceString = mPriceEditText.getText().toString().trim();
-        String quantityString = mQuantityEditText.getText().toString().trim();
-        String supplierString = mSupplierEditText.getText().toString().trim();
+        String nameString = binding.itemInclude.editItemName.getText().toString().trim();
+        String priceString = binding.itemInclude.editItemPrice.getText().toString().trim();
+        String quantityString = binding.quantityInclude.editItemQuantity.getText().toString().trim();
+        String supplierString = binding.supplierInclude.editProductSupplier.getText().toString().trim();
+        String supplierEmailString = binding.supplierInclude.editProductSupplierEmail.getText().toString().trim();
         String picturePathString;
-        if (pictureUri != null){
+        if (pictureUri != null) {
             picturePathString = pictureUri.toString();
         } else {
             picturePathString = "0";
@@ -227,11 +200,12 @@ public class EditorActivity extends AppCompatActivity implements
 
         values.put(ProductEntry.COLUMN_PRODUCT_PRICE, price);
 
-        if (!TextUtils.isEmpty(quantityString)) {
+        if (!quantityString.equals("0")) {
             quantity = parseInt(quantityString);
         }
         values.put(ProductEntry.COLUMN_PRODUCT_QUANTITY, quantity);
-        values.put(ProductEntry.COLUMN_PRODUCT_SUPPLIER, supplierString);
+        values.put(ProductEntry.COLUMN_PRODUCT_SUPPLIER_NAME, supplierString);
+        values.put(ProductEntry.COLUMN_PRODUCT_SUPPLIER_EMAIL, supplierEmailString);
         values.put(ProductEntry.COLUMN_PRODUCT_PICTURE, picturePathString);
 
         // Determine if this is a new or existing product by checking if mCurrentProductUri is null or not
@@ -270,8 +244,8 @@ public class EditorActivity extends AppCompatActivity implements
                 Toast.makeText(this, R.string.price_validator, Toast.LENGTH_SHORT).show();
             } else if (TextUtils.isEmpty(quantityString)) {
                 Toast.makeText(this, R.string.quantity_validator, Toast.LENGTH_SHORT).show();
-           // } else if (TextUtils.isEmpty(supplierString)) {
-                //Toast.makeText(this, R.string.supplier_validator, Toast.LENGTH_SHORT).show();
+            } else if (TextUtils.isEmpty(supplierString)) {
+                Toast.makeText(this, R.string.supplier_validator, Toast.LENGTH_SHORT).show();
             } else {
                 saveFlag = true;
                 // Otherwise this is an EXISTING product, so update the product with content URI: mCurrentProductUri
@@ -396,7 +370,8 @@ public class EditorActivity extends AppCompatActivity implements
                 ProductEntry.COLUMN_PRODUCT_NAME,
                 ProductEntry.COLUMN_PRODUCT_PRICE,
                 ProductEntry.COLUMN_PRODUCT_QUANTITY,
-                ProductEntry.COLUMN_PRODUCT_SUPPLIER,
+                ProductEntry.COLUMN_PRODUCT_SUPPLIER_NAME,
+                ProductEntry.COLUMN_PRODUCT_SUPPLIER_EMAIL,
                 ProductEntry.COLUMN_PRODUCT_PICTURE};
 
         // This loader will execute the ContentProvider's query method on a background thread
@@ -420,14 +395,16 @@ public class EditorActivity extends AppCompatActivity implements
             int nameColumnIndex = cursor.getColumnIndex(ProductEntry.COLUMN_PRODUCT_NAME);
             int priceColumnIndex = cursor.getColumnIndex(ProductEntry.COLUMN_PRODUCT_PRICE);
             int quantityColumnIndex = cursor.getColumnIndex(ProductEntry.COLUMN_PRODUCT_QUANTITY);
-            int supplierColumnIndex = cursor.getColumnIndex(ProductEntry.COLUMN_PRODUCT_SUPPLIER);
+            int supplierColumnIndex = cursor.getColumnIndex(ProductEntry.COLUMN_PRODUCT_SUPPLIER_NAME);
+            int supplierEmailColumnIndex = cursor.getColumnIndex(ProductEntry.COLUMN_PRODUCT_SUPPLIER_EMAIL);
             int pictureColumnIndex = cursor.getColumnIndex(ProductEntry.COLUMN_PRODUCT_PICTURE);
 
             // Extract out the value from the Cursor for the given column index
-            String name = cursor.getString(nameColumnIndex);
+            productName = cursor.getString(nameColumnIndex);
             int price = cursor.getInt(priceColumnIndex);
             quantity = cursor.getInt(quantityColumnIndex);
-            String supplier = cursor.getString(supplierColumnIndex);
+            String supplierName = cursor.getString(supplierColumnIndex);
+            supplierEmail = cursor.getString(supplierEmailColumnIndex);
             String uriString = cursor.getString(pictureColumnIndex);
             pictureUri = Uri.parse(uriString);
 
@@ -442,7 +419,7 @@ public class EditorActivity extends AppCompatActivity implements
                 Bitmap image = BitmapFactory.decodeStream(inputStream);
 
                 // show the image to the user
-                imgPicture.setImageBitmap(image);
+                binding.buttonsInclude.productImage.setImageBitmap(image);
 
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
@@ -451,23 +428,25 @@ public class EditorActivity extends AppCompatActivity implements
             }
 
             // Update the views on the screen with the values from the database
-            mNameEditText.setText(name);
-            mSupplierEditText.setText(supplier);
-            mPriceEditText.setText(String.valueOf(price));
-            mQuantityEditText.setText(String.valueOf(quantity));
+            binding.itemInclude.editItemName.setText(productName);
+            binding.supplierInclude.editProductSupplier.setText(supplierName);
+            binding.supplierInclude.editProductSupplierEmail.setText(supplierEmail);
+            binding.itemInclude.editItemPrice.setText(String.valueOf(price));
+            binding.quantityInclude.editItemQuantity.setText(String.valueOf(quantity));
         }
     }
 
     @Override
     public void onLoaderReset(Loader<Cursor> loader) {
-        mNameEditText.setText("");
-        mSupplierEditText.setText("");
-        mPriceEditText.setText("");
-        mQuantityEditText.setText("");
+        binding.itemInclude.editItemName.setText("");
+        binding.supplierInclude.editProductSupplier.setText("");
+        binding.supplierInclude.editProductSupplierEmail.setText("");
+        binding.itemInclude.editItemPrice.setText("");
+        binding.quantityInclude.editItemQuantity.setText("");
     }
 
     public void displayQuantity(int number) {
-        mQuantityEditText.setText("" + number);
+        binding.quantityInclude.editItemQuantity.setText("" + number);
     }
 
     public void increaseQuantityAmount(View view) {
@@ -549,23 +528,35 @@ public class EditorActivity extends AppCompatActivity implements
             // Show a toast message depending on whether or not the delete was successful.
             if (rowsDeleted == 0) {
                 // If no rows were deleted, then there was an error with the delete.
-                Toast.makeText(this, getString(R.string.editor_delete_product_failed),
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.editor_delete_product_failed), Toast.LENGTH_SHORT).show();
             } else {
                 // Otherwise, the delete was successful and we can display a toast.
-                Toast.makeText(this, getString(R.string.editor_delete_product_successful),
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.editor_delete_product_successful), Toast.LENGTH_SHORT).show();
             }
         }
         // Close the activity
         finish();
     }
 
-    public void contactSupplier (View view){
-        Intent intent = new Intent(Intent.ACTION_SENDTO);
-        intent.setData(Uri.parse("mailto:"));
-        if (intent.resolveActivity(getPackageManager()) != null) {
-            startActivity(intent);
+    public void contactSupplier(View view) {
+
+        if (TextUtils.isEmpty(supplierEmail)) {
+            Toast toast = Toast.makeText(this, getString(R.string.empty_email), Toast.LENGTH_LONG);
+            TextView v = (TextView) toast.getView().findViewById(android.R.id.message);
+            if (v != null) v.setGravity(Gravity.CENTER);
+            toast.show();
+        } else {
+            Intent intent = new Intent(Intent.ACTION_SENDTO);
+            intent.setData(Uri.parse("mailto:"));
+            intent.putExtra(Intent.EXTRA_EMAIL, new String[]{supplierEmail});
+
+            String emailSubject = getString(R.string.supplies_order);
+            emailSubject = String.format(emailSubject, productName);
+            intent.putExtra(Intent.EXTRA_SUBJECT, emailSubject);
+
+            if (intent.resolveActivity(getPackageManager()) != null) {
+                startActivity(intent);
+            }
         }
     }
 }

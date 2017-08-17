@@ -8,9 +8,9 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.Loader;
 import android.database.Cursor;
+import android.databinding.DataBindingUtil;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -18,10 +18,10 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.ListView;
 
 import com.example.android.inventory.data.ProductContract;
 import com.example.android.inventory.data.ProductContract.ProductEntry;
+import com.example.android.inventory.databinding.ActivityCatalogBinding;
 
 public class CatalogActivity extends AppCompatActivity implements
         LoaderManager.LoaderCallbacks<Cursor> {
@@ -31,15 +31,16 @@ public class CatalogActivity extends AppCompatActivity implements
 
     /** Adapter for the ListView */
     ProductCursorAdapter mCursorAdapter;
+    // Binding for Activity Catalog
+    ActivityCatalogBinding binding;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_catalog);
+        binding = DataBindingUtil.setContentView(this, R.layout.activity_catalog);
 
         // Setup FAB to open EditorActivity
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
+        binding.fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Intent intent = new Intent(CatalogActivity.this, EditorActivity.class);
@@ -47,20 +48,16 @@ public class CatalogActivity extends AppCompatActivity implements
             }
         });
 
-        // Find ListView to populate
-        ListView productListView = (ListView) findViewById(R.id.list);
-
-        // Find and set empty view on the ListView, so that it only shows when the list has 0 items.
-        View emptyView = findViewById(R.id.empty_view);
-        productListView.setEmptyView(emptyView);
+        // Set empty view on the ListView, so that it only shows when the list has 0 items.
+        binding.list.setEmptyView(binding.emptyView);
 
         // Setup cursor adapter using cursor from last step
         mCursorAdapter = new ProductCursorAdapter(this, null);
         // Attach cursor adapter to the ListView
-        productListView.setAdapter(mCursorAdapter);
+        binding.list.setAdapter(mCursorAdapter);
 
         // Setup the item click listener
-        productListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        binding.list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int position, long id) {
                 // Create new intent to go to {@link EditorActivity}
@@ -70,7 +67,7 @@ public class CatalogActivity extends AppCompatActivity implements
                 // by appending the "id" (passed as input to this method) onto the
                 // {@link ProductEntry#CONTENT_URI}.
                 // For example, the URI would be "content://com.example.android.products/products/2"
-                // if the pet with ID 2 was clicked on.
+                // if the product with ID 2 was clicked on.
                 Uri currentProductUri = ContentUris.withAppendedId(ProductEntry.CONTENT_URI, id);
 
                 // Set the URI on the data field of the intent
@@ -80,7 +77,6 @@ public class CatalogActivity extends AppCompatActivity implements
                 startActivity(intent);
             }
         });
-
 
         getLoaderManager().initLoader(PRODUCT_LOADER, null, this);
     }
@@ -100,7 +96,8 @@ public class CatalogActivity extends AppCompatActivity implements
         values.put(ProductEntry.COLUMN_PRODUCT_NAME, getString(R.string.dummy_product_name));
         values.put(ProductEntry.COLUMN_PRODUCT_PRICE, 4);
         values.put(ProductEntry.COLUMN_PRODUCT_QUANTITY, 1);
-        values.put(ProductEntry.COLUMN_PRODUCT_SUPPLIER, getString(R.string.dummy_product_supplier));
+        values.put(ProductEntry.COLUMN_PRODUCT_SUPPLIER_NAME, getString(R.string.dummy_product_supplier));
+        values.put(ProductEntry.COLUMN_PRODUCT_SUPPLIER_EMAIL, getString(R.string.dummy_provider_email));
 
         Uri uri = Uri.parse("android.resource://"+ProductContract.CONTENT_AUTHORITY+"/drawable/lego_batman");
         values.put(ProductEntry.COLUMN_PRODUCT_PICTURE,uri.toString());
