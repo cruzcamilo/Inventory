@@ -50,5 +50,31 @@
                     android:inputType="textEmailAddress" />
             </LinearLayout>
         </LinearLayout>
+
+        <!-- Supplier email category -->
+        <LinearLayout
+            android:id="@+id/container_supplier_button"
+            style="@style/CategoryStyle">
+
+            <!-- Label -->
+            <TextView
+                style="@style/LabelStyle"
+                />
+
+            <!-- Input fields -->
+            <RelativeLayout style="@style/input_fields">
+
+                <Button
+                    android:id="@+id/contact_supplier"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+
+
+                    android:onClick="contactSupplier"
+                    android:text="@string/order_more"
+
+                    />
+            </RelativeLayout>
+        </LinearLayout>
     </LinearLayout>
 </layout>

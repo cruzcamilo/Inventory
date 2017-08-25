@@ -1,11 +1,14 @@
 package com.example.android.inventory;
 
+import android.Manifest;
 import android.app.LoaderManager;
 import android.content.ContentValues;
 import android.content.CursorLoader;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.Loader;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.databinding.DataBindingUtil;
 import android.graphics.Bitmap;
@@ -13,25 +16,40 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.NavUtils;
+import android.support.v4.content.ContextCompat;
+import android.support.v4.content.FileProvider;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.android.inventory.data.ProductContract.ProductEntry;
 import com.example.android.inventory.databinding.ActivityEditorBinding;
 
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
 
+import static com.example.android.inventory.data.ProductProvider.LOG_TAG;
 import static java.lang.Integer.parseInt;
 
 /**
@@ -43,17 +61,29 @@ public class EditorActivity extends AppCompatActivity implements
     // Identifier for the product data loader
     private static final int EXISTING_PRODUCT_LOADER = 1;
 
-
     // Content URI for the existing product (null if it's a new product)
     private Uri mCurrentProductUri;
 
     public static final int IMAGE_GALLERY_REQUEST = 20;
+    private static final int CAMERA_REQUEST = 21;
+    private static final int MY_PERMISSIONS_REQUEST = 22;
+    private static final String STATE_URI = "STATE_URI";
+
     int quantity = 0;
     private boolean saveFlag;
     private boolean mProductHasChanged = false;
     public Uri pictureUri;
     String supplierEmail;
     String productName;
+    private ImageView mImageView;
+    int targetW;
+    int targetH;
+    private Button mButtonTakePicture;
+
+    private static final String JPEG_FILE_PREFIX = "IMG_";
+    private static final String JPEG_FILE_SUFFIX = ".jpg";
+    private static final String CAMERA_DIR = "/dcim/";
+    private static final String FILE_PROVIDER_AUTHORITY = "com.example.android.myfileprovider";
 
     private View.OnTouchListener mTouchListener = new View.OnTouchListener() {
         @Override
@@ -86,12 +116,12 @@ public class EditorActivity extends AppCompatActivity implements
             // (It doesn't make sense to delete a product that hasn't been created yet.)
             invalidateOptionsMenu();
 
-            binding.buttonsInclude.contactSupplier.setVisibility(View.GONE);
+            binding.supplierInclude.contactSupplier.setVisibility(View.GONE);
         } else {
             // Otherwise this is an existing product, so change app bar to say "Edit Item"
             setTitle(getString(R.string.editor_activity_title_edit_item));
             binding.buttonsInclude.insertImageButton.setText(R.string.change_image);
-            binding.buttonsInclude.contactSupplier.setVisibility(View.VISIBLE);
+            binding.supplierInclude.contactSupplier.setVisibility(View.VISIBLE);
             getLoaderManager().initLoader(EXISTING_PRODUCT_LOADER, null, this);
         }
 
@@ -104,6 +134,8 @@ public class EditorActivity extends AppCompatActivity implements
         binding.supplierInclude.editProductSupplier.setOnTouchListener(mTouchListener);
         binding.supplierInclude.editProductSupplierEmail.setOnTouchListener(mTouchListener);
 
+        mImageView = (ImageView) findViewById(R.id.product_image);
+
         Button addImage = (Button) findViewById(R.id.insert_image_button);
         addImage.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -111,6 +143,107 @@ public class EditorActivity extends AppCompatActivity implements
                 openGallery();
             }
         });
+
+        //https://stackoverflow.com/questions/7733813/how-can-you-tell-when-a-layout-has-been-drawn
+        final LinearLayout layout = (LinearLayout) findViewById(R.id.container_image);
+        ViewTreeObserver vto = layout.getViewTreeObserver();
+        vto.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                layout.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                targetW = layout.getMeasuredWidth();
+                targetH = layout.getMeasuredHeight();
+            }
+        });
+        mButtonTakePicture = (Button) findViewById(R.id.take_photo);
+        mButtonTakePicture.setEnabled(false);
+        requestPermissions();
+    }
+
+    public void requestPermissions() {
+        // Here, thisActivity is the current activity
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+
+            // Should we show an explanation?
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.READ_EXTERNAL_STORAGE) ||
+                    ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+
+                // Show an explanation to the user *asynchronously* -- don't block
+                // this thread waiting for the user's response! After the user
+                // sees the explanation, try again to request the permission.
+
+            } else {
+
+                // No explanation needed, we can request the permission.
+
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.READ_EXTERNAL_STORAGE,
+                                Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                        MY_PERMISSIONS_REQUEST);
+
+                // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
+                // app-defined int constant. The callback method gets the
+                // result of the request.
+            }
+        } else {
+            mButtonTakePicture.setEnabled(true);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED
+                        && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
+
+                    // permission was granted, yay! Do the
+                    // contacts-related task you need to do.
+                    mButtonTakePicture.setEnabled(true);
+                } else {
+
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+
+                }
+                return;
+            }
+
+            // other 'case' lines to check for other
+            // permissions this app might request
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+
+        if (pictureUri != null)
+            outState.putString(STATE_URI, pictureUri.toString());
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+
+        if (savedInstanceState.containsKey(STATE_URI) &&
+                !savedInstanceState.getString(STATE_URI).equals("")) {
+            pictureUri = Uri.parse(savedInstanceState.getString(STATE_URI));
+
+
+            ViewTreeObserver viewTreeObserver = mImageView.getViewTreeObserver();
+            viewTreeObserver.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                @Override
+                public void onGlobalLayout() {
+                    mImageView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                    mImageView.setImageBitmap(getBitmapFromUri(pictureUri));
+                }
+            });
+        }
     }
 
     public void openGallery() {
@@ -129,6 +262,46 @@ public class EditorActivity extends AppCompatActivity implements
         startActivityForResult(Intent.createChooser(photoPickerIntent, "Select Picture"), IMAGE_GALLERY_REQUEST);
     }
 
+    public void takePicture(View view) {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        /*try {
+            File f = createImageFile();
+            pictureUri = Uri.fromFile(f);
+            startActivityForResult(takePictureIntent, CAMERA_REQUEST);
+            takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, pictureUri);
+            startActivityForResult(takePictureIntent, CAMERA_REQUEST);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }*/
+
+        try {
+            File f = createImageFile();
+
+            Log.d(LOG_TAG, "File: " + f.getAbsolutePath());
+
+            pictureUri = FileProvider.getUriForFile(
+                    this, FILE_PROVIDER_AUTHORITY, f);
+
+            takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, pictureUri);
+
+            // Solution taken from http://stackoverflow.com/a/18332000/3346625
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.KITKAT) {
+                List<ResolveInfo> resInfoList = getPackageManager().queryIntentActivities(takePictureIntent, PackageManager.MATCH_DEFAULT_ONLY);
+                for (ResolveInfo resolveInfo : resInfoList) {
+                    String packageName = resolveInfo.activityInfo.packageName;
+                    grantUriPermission(packageName, pictureUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                }
+            }
+
+            if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+                startActivityForResult(takePictureIntent, CAMERA_REQUEST);
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -141,28 +314,63 @@ public class EditorActivity extends AppCompatActivity implements
                 // the address of the image on the SD Card.
                 pictureUri = data.getData();
 
-                // Log.v("pictureUri 2", pictureUri.toString());
-                // declare a stream to read the image data from the SD Card.
-                InputStream inputStream;
-
-                // we are getting an input stream, based on the URI of the image.
-                try {
-                    inputStream = getContentResolver().openInputStream(pictureUri);
-
-                    // get a bitmap from the stream.
-                    Bitmap image = BitmapFactory.decodeStream(inputStream);
-                    // show the image to the user
-
-                    binding.buttonsInclude.productImage.setImageBitmap(image);
-
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                    // show a message to the user indictating that the image is unavailable.
-                    Toast.makeText(this, "Unable to open image", Toast.LENGTH_LONG).show();
-                }
+                mImageView.setImageBitmap(getBitmapFromUri(pictureUri));
+            } else if (requestCode == CAMERA_REQUEST) {
+                mImageView.setImageBitmap(getBitmapFromUri(pictureUri));
             }
         }
     }
+
+    public Bitmap getBitmapFromUri(Uri uri) {
+
+        if (uri == null || uri.toString().isEmpty())
+            return null;
+
+        Log.v("Target size", String.valueOf(targetW) + " " + String.valueOf(targetW));
+
+        InputStream input = null;
+        try {
+            input = this.getContentResolver().openInputStream(uri);
+
+            // Get the dimensions of the bitmap
+            BitmapFactory.Options bmOptions = new BitmapFactory.Options();
+            bmOptions.inJustDecodeBounds = true;
+            BitmapFactory.decodeStream(input, null, bmOptions);
+            input.close();
+
+            int photoW = bmOptions.outWidth;
+            int photoH = bmOptions.outHeight;
+
+            Log.v("Photo size", String.valueOf(photoW) + " " + String.valueOf(photoH));
+
+            // Determine how much to scale down the image
+            int scaleFactor = Math.min(photoW / targetW, photoH / targetH);
+
+            // Decode the image file into a Bitmap sized to fill the View
+            bmOptions.inJustDecodeBounds = false;
+            bmOptions.inSampleSize = scaleFactor;
+            bmOptions.inPurgeable = true;
+
+            input = this.getContentResolver().openInputStream(uri);
+            Bitmap bitmap = BitmapFactory.decodeStream(input, null, bmOptions);
+            input.close();
+            return bitmap;
+
+        } catch (FileNotFoundException fne) {
+            Log.e(LOG_TAG, "Failed to load image.", fne);
+            return null;
+        } catch (Exception e) {
+            Log.e(LOG_TAG, "Failed to load image.", e);
+            return null;
+        } finally {
+            try {
+                input.close();
+            } catch (IOException ioe) {
+
+            }
+        }
+    }
+
 
     private void saveProduct() {
 
@@ -408,24 +616,10 @@ public class EditorActivity extends AppCompatActivity implements
             String uriString = cursor.getString(pictureColumnIndex);
             pictureUri = Uri.parse(uriString);
 
-            // declare a stream to read the image data from the SD Card.
-            InputStream inputStream;
+            Bitmap image = getBitmapFromUri(pictureUri);
 
-            // we are getting an input stream, based on the URI of the image.
-            try {
-                inputStream = getContentResolver().openInputStream(pictureUri);
-
-                // get a bitmap from the stream.
-                Bitmap image = BitmapFactory.decodeStream(inputStream);
-
-                // show the image to the user
-                binding.buttonsInclude.productImage.setImageBitmap(image);
-
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                // show a message to the user indictating that the image is unavailable.
-                Toast.makeText(this, "Unable to open image", Toast.LENGTH_LONG).show();
-            }
+            // show the image to the user
+            mImageView.setImageBitmap(image);
 
             // Update the views on the screen with the values from the database
             binding.itemInclude.editItemName.setText(productName);
@@ -485,9 +679,6 @@ public class EditorActivity extends AppCompatActivity implements
         alertDialog.show();
     }
 
-    /**
-     * Prompt the user to confirm that they want to delete this product.
-     */
     private void showDeleteConfirmationDialog() {
         // Create an AlertDialog.Builder and set the message, and click listeners
         // for the positive and negative buttons on the dialog.
@@ -514,9 +705,6 @@ public class EditorActivity extends AppCompatActivity implements
         alertDialog.show();
     }
 
-    /**
-     * Perform the deletion of the product in the database.
-     */
     private void deleteProduct() {
         // Only perform the delete if this is an existing product.
         if (mCurrentProductUri != null) {
@@ -536,6 +724,40 @@ public class EditorActivity extends AppCompatActivity implements
         }
         // Close the activity
         finish();
+    }
+
+    private File createImageFile() throws IOException {
+        // Create an image file name
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String imageFileName = JPEG_FILE_PREFIX + timeStamp + "_";
+        File albumF = getAlbumDir();
+        File imageF = File.createTempFile(imageFileName, JPEG_FILE_SUFFIX, albumF);
+        return imageF;
+    }
+
+    private File getAlbumDir() {
+        File storageDir = null;
+
+        if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
+
+            storageDir = new File(Environment.getExternalStorageDirectory()
+                    + CAMERA_DIR
+                    + getString(R.string.app_name));
+
+            Log.d(LOG_TAG, "Dir: " + storageDir);
+
+            if (storageDir != null) {
+                if (!storageDir.mkdirs()) {
+                    if (!storageDir.exists()) {
+                        Log.d(LOG_TAG, "failed to create directory");
+                        return null;
+                    }
+                }
+            }
+        } else {
+            Log.v(getString(R.string.app_name), "External storage is not mounted READ/WRITE.");
+        }
+        return storageDir;
     }
 
     public void contactSupplier(View view) {
@@ -559,4 +781,6 @@ public class EditorActivity extends AppCompatActivity implements
             }
         }
     }
+
+
 }
