@@ -6,7 +6,9 @@ import android.provider.BaseColumns;
 
 public final class ProductContract {
 
-    private ProductContract() {};
+    private ProductContract() {
+        throw new AssertionError("No instances for you!");
+    };
 
     public static final String CONTENT_AUTHORITY = "com.example.android.inventory";
     public static final Uri BASE_CONTENT_URI = Uri.parse("content://" + CONTENT_AUTHORITY);

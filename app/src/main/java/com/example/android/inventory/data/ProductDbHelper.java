@@ -39,6 +39,6 @@ public class ProductDbHelper extends SQLiteOpenHelper {
     }
 
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-
+        //database is only on version 1, so no upgrade is required
     }
 }
