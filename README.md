@@ -24,5 +24,5 @@ This app allows to keep track of an inventory of products.
 
 - Use of `intents` to access gallery and camera to store a photo of a product.
 - Performs CRUD using `SQLiteDatabase`.
-- Use `contentProvider`.
+- Use of `contentProvider`.
 - Input validation.
