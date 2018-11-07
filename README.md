@@ -9,13 +9,6 @@ Esta aplicación permite llevar registro de un inventario de productos.
 - Uso de `contentProvider`.
 - Validación de datos de entrada.
 
-## Screenshots
-
-![](screenshots/screenshot1.png)
-![](screenshots/screenshot2.png)
-
-<hr>
-
 # Inventory
 
 This app allows to keep track of an inventory of products.
@@ -26,3 +19,11 @@ This app allows to keep track of an inventory of products.
 - Performs CRUD using `SQLiteDatabase`.
 - Use of `contentProvider`.
 - Input validation.
+
+
+## Screenshots
+
+![](screenshots/screenshot1.png)
+![](screenshots/screenshot2.png)
+
+<hr>
