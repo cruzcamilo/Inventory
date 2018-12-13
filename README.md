@@ -1,17 +1,6 @@
 # Inventory
 
-Esta aplicación permite llevar registro de un inventario de productos. 
-
-## Características
-
-- Uso de `Intents` para acceder galería y cámara para almacenar foto del producto.
-- Realiza CRUD usando `SQLiteDatabase`.
-- Uso de `contentProvider`.
-- Validación de datos de entrada.
-
-# Inventory
-
-This app allows to keep track of an inventory of products.
+This app allows to create and keep track of a product inventory stored in a SQLite Database.
 
 ## Features
 
@@ -19,7 +8,6 @@ This app allows to keep track of an inventory of products.
 - Performs CRUD using `SQLiteDatabase`.
 - Use of `contentProvider`.
 - Input validation.
-
 
 ## Screenshots
 
